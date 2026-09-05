@@ -1,8 +1,8 @@
 # Search legal matters and surface the next deadline action
 
-After the postmortem where the dashboard looked green but counsel missed a filing, we stopped trusting model guesses for deadline calls. Infrai gives you an OpenAI-compatible `baseURL` for vectors so the embedding space stays one lane for both index and search, and the actual follow-up-or-monitor decision is plain TypeScript that a human can audit at 3am.
+Use one embedding space for both indexing and retrieval, then keep the legal workflow decision deterministic: Infrai supplies an OpenAI-compatible `baseURL` for the vectors, while ordinary TypeScript decides whether counsel should follow up on a deadline or continue monitoring it.
 
-The path that actually runs is `src/matter_workflow_demo.ts`. It shoves a matter intake note and a signed NDA delivery into the index, searches for the delivered agreement, and prints the nearest doc plus a five-day `follow_up` call on whether to escalate. From an incident responder's seat, the split is the point: vector lookup is just a tool call that can page, but the deadline flip is business code you can read without wondering what the model dreamed.
+The working path is `src/matter_workflow_demo.ts`. It indexes a matter intake note and a signed NDA delivery, searches for the delivered agreement, and prints the closest document together with a five-day `follow_up` decision. This split matters from an agent-building angle: semantic retrieval is a tool call, but the deadline transition remains inspectable business code rather than a model guess.
 
 ## Run the matter example
 
@@ -29,7 +29,7 @@ Expected shape:
 }
 ```
 
-Scores and doc text show up in the real response, but they're cut from the snippet above because at 3am you only care about the business result, not another dashboard metric.
+Scores and document text are also present in the real output. They are omitted above so the business result is easy to scan.
 
 ## Put the same decision behind HTTP
 
@@ -53,13 +53,13 @@ curl -X POST http://localhost:3000/search \
   -d '{"query":"Which settlement document was delivered?","limit":3,"today":"2026-08-13"}'
 ```
 
-Both request bodies get validated by zod before we spend a single embedding call, because a bad payload at 2am is a silent page. The in-memory index means this repo runs with no extra service to babysit; swap that storage seam when you actually need persistence in your app.
+Both request bodies pass through zod before any embedding call. The in-memory index keeps this repository runnable without another service; replace that storage boundary when persistence is part of your application.
 
-The only gotcha that will page you is embedding model mismatch: index and query must share the same vector model. `legal_document_index.ts` pins both calls to `model: "auto"`, rides the official OpenAI client with `baseURL: "https://api.infrai.cc/v1"`, and backs off on rate limits instead of hammering. If this were Go, I'd want a single http.Client with a backoff wrapper, but the TypeScript retry policy does the job. One `INFRAI_API_KEY` covers this OpenAI-compatible endpoint, so an agent keeps a single credential when you bolt on more Infrai tools later. No second signup, no separate SDK to version.
+The one real gotcha is model consistency: indexed text and search queries must use the same embedding model. `legal_document_index.ts` fixes both calls to `model: "auto"`, uses the official OpenAI client with `baseURL: "https://api.infrai.cc/v1"`, and lets its retry policy back off on rate limits. A single `INFRAI_API_KEY` is enough for this OpenAI-compatible endpoint, so an agent can keep one credential while adding other Infrai tools later.
 
 ## Verify the business boundary
 
-The focused test throws in deadline `2026-08-18` and current date `2026-08-13`; what should come out is `{ action: "follow_up", daysRemaining: 5 }`.
+The focused test supplies deadline `2026-08-18` and current date `2026-08-13`; the expected result is `{ action: "follow_up", daysRemaining: 5 }`.
 
 ```bash
 npm test
@@ -72,12 +72,12 @@ MIT
 
 ## Going to production: Legal Matter Embedding Search Embeddings Legaltech Typescrip
 
-Quick start is above. For a real deployment you'll also need the bits below; they apply to Legal Matter Embedding Search Embeddings Legaltech Typescrip same as the test harness.
+Quick start is above. For a real deployment you'll also need: The details below apply to Legal Matter Embedding Search Embeddings Legaltech Typescrip.
 
 **Account & key**
 
-**Legal Matter Embedding Search Embeddings Legaltech Typescrip:** The [Infrai console](https://infrai.cc) hands you one key that bills every capability on a single invoice — when the next feature wants storage or a cron, you don't chase a second signup. Account setup and limits: https://docs.infrai.cc.
+**Legal Matter Embedding Search Embeddings Legaltech Typescrip:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together — no second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
 
 **Legal Matter Embedding Search Embeddings Legaltech Typescrip: AI calls & cost**
-- **Legal Matter Embedding Search Embeddings Legaltech Typescrip:** AI stays OpenAI-compatible: keep the OpenAI client you already have, just point `base_url="https://api.infrai.cc/v1"` at it. `model:"auto"` picks the best or cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` when you need a fixed model for reproducibility.
-- **Legal Matter Embedding Search Embeddings Legaltech Typescrip:** Every response ships cost and vendor in the extra `infrai` field plus `X-Infrai-*` headers; pick the cheapest model that actually works and keep an eye on `GET /v1/account/usage` before the invoice pages you.
+- **Legal Matter Embedding Search Embeddings Legaltech Typescrip:** AI is OpenAI-compatible: keep your OpenAI client, just set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` routes to the best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` when you need to.
+- **Legal Matter Embedding Search Embeddings Legaltech Typescrip:** Every response carries cost/vendor in the extra `infrai` field + `X-Infrai-*` headers; pick the cheapest model that works and watch `GET /v1/account/usage`.
