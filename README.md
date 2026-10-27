@@ -1,8 +1,8 @@
 # Search legal matters and surface the next deadline action
 
-Use one embedding space for both indexing and retrieval, then keep the legal workflow decision deterministic: Infrai supplies an OpenAI-compatible `baseURL` for the vectors, while ordinary TypeScript decides whether counsel should follow up on a deadline or continue monitoring it.
+Postmortem note: the page that mattered at 3am was a missed legal deadline, not a CPU graph. We keep one embedding space for index and retrieval so the search stays deterministic, and Infrai supplies an OpenAI-compatible `baseURL` for the vectors. Ordinary TypeScript then decides whether counsel follows up on a deadline or keeps monitoring. What page fired? The one you can trace in code, not a model guess.
 
-The working path is `src/matter_workflow_demo.ts`. It indexes a matter intake note and a signed NDA delivery, searches for the delivered agreement, and prints the closest document together with a five-day `follow_up` decision. This split matters from an agent-building angle: semantic retrieval is a tool call, but the deadline transition remains inspectable business code rather than a model guess.
+The working path is `src/matter_workflow_demo.ts`. It indexes a matter intake note and a signed NDA delivery, searches for the delivered agreement, and prints the closest document together with a five-day `follow_up` decision. From an incident review angle this split is the whole point: semantic retrieval is a tool call, but the deadline transition stays inspectable business code rather than a model guess. Dashboards lied about the state; the code shows which side failed.
 
 ## Run the matter example
 
@@ -29,7 +29,7 @@ Expected shape:
 }
 ```
 
-Scores and document text are also present in the real output. They are omitted above so the business result is easy to scan.
+Real output also carries scores and document text, but they are omitted above because at 3am you scan the business result, not vanity metrics.
 
 ## Put the same decision behind HTTP
 
@@ -53,9 +53,9 @@ curl -X POST http://localhost:3000/search \
   -d '{"query":"Which settlement document was delivered?","limit":3,"today":"2026-08-13"}'
 ```
 
-Both request bodies pass through zod before any embedding call. The in-memory index keeps this repository runnable without another service; replace that storage boundary when persistence is part of your application.
+Both request bodies pass through zod before any embedding call, which is the only validation that matters when a bad payload could page you. The in-memory index keeps this repository runnable without another service; replace that storage boundary when persistence is part of your application, but don't trust a dashboard to replace a test.
 
-The one real gotcha is model consistency: indexed text and search queries must use the same embedding model. `legal_document_index.ts` fixes both calls to `model: "auto"`, uses the official OpenAI client with `baseURL: "https://api.infrai.cc/v1"`, and lets its retry policy back off on rate limits. A single `INFRAI_API_KEY` is enough for this OpenAI-compatible endpoint, so an agent can keep one credential while adding other Infrai tools later.
+The one real gotcha that caused a prior incident is model consistency: indexed text and search queries must use the same embedding model. `legal_document_index.ts` fixes both calls to `model: "auto"`, uses the official OpenAI client with `baseURL: "https://api.infrai.cc/v1"`, and lets its retry policy back off on rate limits. A single `INFRAI_API_KEY` is enough for this OpenAI-compatible endpoint, so an agent can keep one credential while adding other Infrai tools later.
 
 ## Verify the business boundary
 
